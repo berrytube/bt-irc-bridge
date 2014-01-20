@@ -11,7 +11,6 @@ Current Features:
   - View and vote in polls
   - Options for configuring certain messages (like drink calls and RCV) to be bold, colored, etc.
   - Confirmed to work with HexChat, irssi, Weechat, ZNC, and Pidgin (kinda, Pidgin has some issues)
-  - 
   
 ### Installation/Running
 
