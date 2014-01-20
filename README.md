@@ -28,6 +28,8 @@ You can also install the Windows release of node and follow the steps for Linux 
 
 Installing Node:
 
+**NOTE**: If you are using a cutting-edge distribution like Arch which has node v0.10 in its repos, you can use the repo version.  If you are using Ubuntu, Linux Mint, or a similar stable distribution, the version of node in their repos is _ancient_ and won't work.
+
   1. Download the latest source code from [nodejs.org](http://nodejs.org/)
   2. Extract the `tar.gz` file
   3. Enter the directory and run `./configure`
