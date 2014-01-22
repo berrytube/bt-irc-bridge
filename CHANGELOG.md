@@ -1,3 +1,7 @@
+#### 2014-01-22 (v1.0.8)
+  - Fix nested formatting issues
+  - Possibly fix duplicate messages on reconnect
+
 #### 2014-01-16 (v1.0.7)
   - Fix Pidgin not connecting to the bridge
 

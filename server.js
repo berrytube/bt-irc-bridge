@@ -14,7 +14,7 @@ var net = require('net');
 var fs = require('fs');
 
 // Config
-var VERSION = '1.0.7';
+var VERSION = '1.0.8';
 var HOSTNAME = 'localhost';
 var CONFIG = {
     yay_color: true,
@@ -106,6 +106,10 @@ function Client(socket) {
 
 Client.prototype.initBerrytube = function () {
     var self = this;
+    try {
+        self.bt.disconnect();
+    } catch (e) {
+    }
     this.bt = require('socket.io-client').connect('96.127.152.99:8344', {
         'force new connection': true
     });
@@ -442,11 +446,6 @@ Client.prototype.handleControl = function (args) {
 
         case 'reconnect': {
             this.socket.write(':control PRIVMSG ' + this.name + ' :Attempting to reconnect to berrytube\r\n');
-            try {
-                this.bt.disconnect();
-            } catch (e) {
-            }
-
             this.initBerrytube();
             break;
         }
@@ -548,13 +547,13 @@ Client.prototype.handleBTMessage = function (data) {
         msg = msg.replace(/<span class="flutter">(.*?)<\/span>/g, '\x0313$1\x03');
     }
     if (CONFIG.show_bold) {
-        msg = msg.replace(/<strong>(.*?)<\/strong>/g, '\x02$1\x0f');
+        msg = msg.replace(/<strong>(.*?)<\/strong>/g, '\x02$1\x02');
     }
     if (CONFIG.show_underline) {
-        msg = msg.replace(/<em>(.*?)<\/em>/g, '\x1f$1\x0f');
+        msg = msg.replace(/<em>(.*?)<\/em>/g, '\x1f$1\x1f');
     }
     if (CONFIG.hide_spoilers) {
-        msg = msg.replace(/<span class="spoiler">.*?<\/span>/g, '\x02(SPOILER HIDDEN)\x0f');
+        msg = msg.replace(/<span class="spoiler">.*?<\/span>/g, '\x02(SPOILER HIDDEN)\x02');
     }
 
     if (CONFIG.strip_html) {
@@ -572,17 +571,17 @@ Client.prototype.handleBTMessage = function (data) {
         case 'request':
             msg = 'requests ' + msg;
             if (CONFIG.request_color) {
-                msg = '\x032' + msg + '\x0f';
+                msg = '\x032' + msg + '\x03';
             }
             msg = '\x01ACTION ' + msg + '\x01';
             break;
         case 'rcv':
             if (CONFIG.rcv_bold) {
-                msg = '\x02' + msg + '\x0f';
+                msg = '\x02' + msg + '\x02';
             }
 
             if (CONFIG.rcv_color) {
-                msg = '\x034' + msg + '\x0f';
+                msg = '\x034' + msg + '\x03';
             }
             break;
         case 'drink':
@@ -592,7 +591,7 @@ Client.prototype.handleBTMessage = function (data) {
             }
 
             if (CONFIG.drink_bold) {
-                msg = '\x02' + msg + '\x0f';
+                msg = '\x02' + msg + '\x02';
             }
             break;
         case 'act':
@@ -600,7 +599,7 @@ Client.prototype.handleBTMessage = function (data) {
             break;
         case 'spoiler':
             if (CONFIG.hide_spoilers) {
-                msg = '\x02(SPOILER HIDDEN)\x0f';
+                msg = '\x02(SPOILER HIDDEN)\x02';
             }
             break;
         default:
