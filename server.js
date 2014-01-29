@@ -53,7 +53,7 @@ function IRCServer(port) {
     this.irc = net.createServer(function (c) {
         self.newClient(c);
     });
-    this.irc.listen(port, function () {
+    this.irc.listen(port, "::", function () {
         console.log('Listening on port', port);
     });
 }
