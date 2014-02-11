@@ -401,7 +401,7 @@ Client.prototype.handlePRIVMSG = function (prefix, args) {
             msg = msg.replace(/\x01ACTION(.*?)\x01/, '/me $1');
 
             this.bt.emit('chat', {
-                msg: args.join(' '),
+                msg: msg,
                 metadata: {
                     channel: 'main',
                     flair: 0
