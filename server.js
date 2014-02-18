@@ -14,7 +14,7 @@ var net = require('net');
 var fs = require('fs');
 
 // Config
-var VERSION = '1.0.8';
+var VERSION = '1.0.9';
 var HOSTNAME = 'localhost';
 var CONFIG = {
     yay_color: true,
@@ -190,7 +190,7 @@ Client.prototype.initBerrytube = function () {
     });
     this.bt.on('forceVideoChange', function (data) {
         var title = decodeURIComponent(data.video.videotitle);
-        self.rpl('332 {nick} #berrytube :Now Playing: ' + title);
+        self.socket.write(':BerryTube!BerryTube@berrytube.tv TOPIC #berrytube :Now Playing: ' + title + '\r\n');
     });
     this.bt.on('createPlayer', function (data) {
         var title = decodeURIComponent(data.video.videotitle);

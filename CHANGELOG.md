@@ -1,3 +1,6 @@
+#### 2014-02-18 (v1.0.9)
+  - Fix topic changes: use `TOPIC` instead of 332
+
 #### 2014-01-22 (v1.0.8)
   - Fix nested formatting issues
   - Possibly fix duplicate messages on reconnect
