@@ -258,7 +258,7 @@ Client.prototype.handleCommand = function (prefix, cmd, args) {
             }
             break;
         case 'PING':
-            this.socket.write('PONG :' + this.name + '\r\n');
+            this.rpl('PONG ' + HOSTNAME + ' :' + HOSTNAME);
             break;
         case 'WHO':
             this.handleWHO(prefix, args);
