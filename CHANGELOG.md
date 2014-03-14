@@ -1,3 +1,6 @@
+#### 2014-03-14 (v1.0.10)
+  - Add autodetection for whether to bind IPv6 or not
+
 #### 2014-02-18 (v1.0.9)
   - Fix topic changes: use `TOPIC` instead of 332
 

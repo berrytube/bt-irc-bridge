@@ -14,7 +14,7 @@ var net = require('net');
 var fs = require('fs');
 
 // Config
-var VERSION = '1.0.9';
+var VERSION = '1.0.10';
 var HOSTNAME = 'localhost';
 var CONFIG = {
     yay_color: true,
@@ -47,14 +47,35 @@ function loadConfig() {
     }
 }
 
+function testIfSupportsIPv6(port, cb) {
+    var test = net.createServer();
+    test.on("error", function () {
+        test.close();
+        cb(false);
+    });
+
+    test.listen(port, "::", function () {
+        test.close();
+        cb(true);
+    });
+}
+
 function IRCServer(port) {
     var self = this;
     this.clients = [];
     this.irc = net.createServer(function (c) {
         self.newClient(c);
     });
-    this.irc.listen(port, "::", function () {
-        console.log('Listening on port', port);
+    testIfSupportsIPv6(port, function (supported) {
+        if (supported) {
+            self.irc.listen(port, "::", function () {
+                console.log('Listening on port %d (dual-stack)', port);
+            });
+        } else {
+            self.irc.listen(port, function () {
+                console.log('Listening on port %d (IPv4 only)', port);
+            });
+        }
     });
 }
 
