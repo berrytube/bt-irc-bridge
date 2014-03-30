@@ -1,3 +1,6 @@
+#### 2014-03-29 (v1.0.11)
+  - Add disconnect handler, permit re-logging in without restarting IRC server
+
 #### 2014-03-14 (v1.0.10)
   - Add autodetection for whether to bind IPv6 or not
 
