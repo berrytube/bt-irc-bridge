@@ -14,7 +14,7 @@ var net = require('net');
 var fs = require('fs');
 
 // Config
-var VERSION = '1.0.10';
+var VERSION = '1.0.11';
 var HOSTNAME = 'localhost';
 var CONFIG = {
     yay_color: true,
@@ -231,6 +231,14 @@ Client.prototype.initBerrytube = function () {
         self.lastPoll = self.poll;
         self.poll = null;
     });
+    this.bt.on('disconnect', function () {
+        self.socket.write(':' + HOSTNAME + ' PRIVMSG ' + self.name + ' :Disconnected from BerryTube\r\n');
+        if (self.loggedIn) {
+            self.loggedIn = false;
+            self.socket.write(':' + self.name + ' NICK anonymous\r\n');
+            self.name = 'anonymous';
+        }
+    });
     this.bt.emit('myPlaylistIsInited');
 };
 
@@ -309,7 +317,7 @@ Client.prototype.handleCommand = function (prefix, cmd, args) {
 };
 
 Client.prototype.handleNICK = function (prefix, args) {
-    if (!this.loggedIn && this.inChannel) {
+    if (this.inChannel) {
         if (args[0][0] === ':') {
             args[0] = args[0].substring(1);
         }
