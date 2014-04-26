@@ -1,3 +1,6 @@
+#### 2014-04-26 (v1.0.12)
+  - Change the way reconnect works to prevent duplicate connections
+
 #### 2014-03-29 (v1.0.11)
   - Add disconnect handler, permit re-logging in without restarting IRC server
 

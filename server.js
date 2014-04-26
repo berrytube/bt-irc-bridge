@@ -14,7 +14,7 @@ var net = require('net');
 var fs = require('fs');
 
 // Config
-var VERSION = '1.0.11';
+var VERSION = '1.0.12';
 var HOSTNAME = 'localhost';
 var CONFIG = {
     yay_color: true,
@@ -128,7 +128,7 @@ function Client(socket) {
 Client.prototype.initBerrytube = function () {
     var self = this;
     try {
-        self.bt.disconnect();
+        self.bt.socket.disconnect(true);
     } catch (e) {
     }
     this.bt = require('socket.io-client').connect('96.127.152.99:8344', {
