@@ -131,7 +131,7 @@ Client.prototype.initBerrytube = function () {
         self.bt.socket.disconnect(true);
     } catch (e) {
     }
-    this.bt = require('socket.io-client').connect('96.127.152.99:8344', {
+    this.bt = require('socket.io-client').connect('berrytube.tv:8344', {
         'force new connection': true
     });
     this.bt.on('newChatList', function (data) {
