@@ -170,19 +170,7 @@ Client.prototype.initBerrytube = function () {
             return;
         }
         self.socket.write(':' + data.ircnick + ' JOIN #berrytube\r\n');
-        switch (data.type) {
-            case 2:
-                self.socket.write(':' + HOSTNAME + ' MODE #berrytube +o ' + data.nick + '\r\n');
-                break;
-            case 1:
-                self.socket.write(':' + HOSTNAME + ' MODE #berrytube +h ' + data.nick + '\r\n');
-                break;
-            case 0:
-                self.socket.write(':' + HOSTNAME + ' MODE #berrytube +v ' + data.nick + '\r\n');
-                break;
-            default:
-                break;
-        }
+        self.handleSetType(data.nick, data.type);
     });
     this.bt.on('userPart', function (data) {
         data.ircnick = data.nick + '!' + data.nick + '@berrytube.tv';
@@ -203,6 +191,11 @@ Client.prototype.initBerrytube = function () {
         self.socket.write(':' + self.name + ' NICK ' + nick + '\r\n');
         self.name = nick;
         self.loggedIn = true;
+    });
+    this.bt.on('setType', function (type) {
+        if (self.loggedIn) {
+            self.handleSetType(self.name, type);
+        }
     });
     this.bt.on('chatMsg', function (data) {
         if (data.nick !== self.name) {
@@ -655,6 +648,22 @@ Client.prototype.handleBTPoll = function (data) {
 Client.prototype.handleBTPollUpdate = function (data) {
     this.poll.votes = data.votes;
 };
+
+Client.prototype.handleSetType = function(nick, type) {
+    switch (type) {
+        case 2:
+            this.socket.write(':' + HOSTNAME + ' MODE #berrytube +o ' + nick + '\r\n');
+            break;
+        case 1:
+            this.socket.write(':' + HOSTNAME + ' MODE #berrytube +h ' + nick + '\r\n');
+            break;
+        case 0:
+            this.socket.write(':' + HOSTNAME + ' MODE #berrytube +v ' + nick + '\r\n');
+            break;
+        default:
+            break;
+    }
+}
 
 process.on('uncaughtException', function (e) {
     console.log(e);
