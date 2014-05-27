@@ -98,6 +98,7 @@ function Client(socket) {
     this.lastPoll = null;
     this.socket = socket;
     this.buffer = '';
+    this.topic = '';
 
     socket.on('data', function (data) {
         self.buffer += data;
@@ -203,12 +204,16 @@ Client.prototype.initBerrytube = function () {
         }
     });
     this.bt.on('forceVideoChange', function (data) {
-        var title = decodeURIComponent(data.video.videotitle);
-        self.socket.write(':BerryTube!BerryTube@berrytube.tv TOPIC #berrytube :Now Playing: ' + title + '\r\n');
+        self.topic = 'Now Playing: ' + decodeURIComponent(data.video.videotitle);
+        self.socket.write(':BerryTube!BerryTube@berrytube.tv TOPIC #berrytube :' + self.topic + '\r\n');
     });
     this.bt.on('createPlayer', function (data) {
-        var title = decodeURIComponent(data.video.videotitle);
-        self.rpl('332 {nick} #berrytube :Now Playing: ' + title);
+        /* createPlayer should only be fired once
+           if createPlayer is fired after the user JOINS the channels we still
+           can send RPL_TOPIC instead of TOPIC, because the topic was empty and
+           JOIN didn't create a RPL_TOPIC message */
+         self.topic = 'Now Playing: ' + decodeURIComponent(data.video.videotitle);
+         self.rpl('332 {nick} #berrytube :' + self.topic);
     });
     this.bt.on('kicked', function (reason) {
         self.socket.write(':' + HOSTNAME + ' PRIVMSG ' + self.name + ' :Kicked: ' + reason + '\r\n');
@@ -275,9 +280,7 @@ Client.prototype.handleCommand = function (prefix, cmd, args) {
             this.handleUSER(prefix, args);
             break;
         case 'JOIN':
-            if (args[0] === '#berrytube') {
-                this.socket.write(':' + this.name + ' JOIN #berrytube\r\n');
-            }
+            this.handleJOIN(prefix, args);
             break;
         case 'PING':
             this.rpl('PONG ' + HOSTNAME + ' :' + HOSTNAME);
@@ -319,7 +322,7 @@ Client.prototype.handleNICK = function (prefix, args) {
             pass: false
         });
     } else if (!this.inChannel) {
-        this.socket.write(':' + args[0] + ' JOIN #berrytube\r\n');
+        this.handleJOIN(prefix,  ['#berrytube']);
         this.socket.write(':' + args[0] + ' NICK anonymous\r\n');
         this.inChannel = true;
     }
@@ -662,6 +665,23 @@ Client.prototype.handleSetType = function(nick, type) {
             break;
         default:
             break;
+    }
+}
+
+Client.prototype.handleJOIN = function(prefix, args) {
+    if (args[0] === '#berrytube') {
+        this.socket.write(':' + this.name + ' JOIN #berrytube\r\n');
+        
+        /* http://tools.ietf.org/html/rfc1459#section-4.2.1
+           If a JOIN is successful, the user is then sent the channel's topic
+           (using RPL_TOPIC) and the list of users who are on the channel (using
+           RPL_NAMREPLY), which must include the user joining. */
+        if (this.topic != '') {
+            this.rpl('332 {nick} #berrytube :' + this.topic);
+        }
+        this.handleNAMES(prefix, args);
+    } else {
+      this.rpl('403 {nick} ' + args[0] + ' :No such channel');
     }
 }
 
