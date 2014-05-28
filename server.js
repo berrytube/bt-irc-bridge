@@ -322,8 +322,8 @@ Client.prototype.handleNICK = function (prefix, args) {
             pass: false
         });
     } else if (!this.inChannel) {
-        this.handleJOIN(prefix,  ['#berrytube']);
         this.socket.write(':' + args[0] + ' NICK anonymous\r\n');
+        this.handleJOIN(prefix,  ['#berrytube']);
         this.inChannel = true;
     }
 };
