@@ -18,7 +18,7 @@ Current Features:
 
 I have a prepackaged version of node + required modules + bridge available:
 
-  1. Download [bt-irc-portable.zip](http://cyzon.us/~cyzon/bt/bt-irc-portable.zip)
+  1. Download [bt-irc-portable.zip](http://tirek.cyzon.us/~cyzon/bt/bt-irc-portable.zip)
   2. Extract the downloaded file
   3. Run btircbridge.bat
 
