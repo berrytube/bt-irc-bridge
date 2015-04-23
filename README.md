@@ -34,13 +34,13 @@ Installing Node:
   2. Extract the `tar.gz` file
   3. Enter the directory and run `./configure`
   4. Run `make` followed by `sudo make install`
-  5. Verify that `node -v` outputs something like `v0.10.24` (last number may vary)
+  5. Verify that `node -v` outputs something like `v0.10.x` or `v0.12.x`
 
 Installing the bridge:
 
   1. Run `git clone https://github.com/berrytube/bt-irc-bridge` (or download the zipball from GitHub and extract it)
   2. `cd bt-irc-bridge`
-  3. `npm install socket.io-client`
+  3. `npm install socket.io-client@^0.9.17`
   4. `node server.js` (Optional: bind a port besides 6667 by running `node server.js <port>`)
 
 ### Controls
