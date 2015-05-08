@@ -27,7 +27,8 @@ var CONFIG = {
     show_underline: true,
     strip_html: true,
     echo: false,
-    hide_spoilers: true
+    hide_spoilers: true,
+    server: 'berrytube.tv:8344'
 };
 
 function saveConfig() {
@@ -132,7 +133,19 @@ Client.prototype.initBerrytube = function () {
         self.bt.socket.disconnect(true);
     } catch (e) {
     }
-    this.bt = require('socket.io-client').connect('berrytube.tv:8344', {
+    var client = require('socket.io-client');
+    client.util.oldreq = client.util.request;
+    client.util.request = function(xdomain){
+        var xhr = client.util.oldreq(xdomain);
+        xhr.addEventListener('readystatechange', function setBridgeUA() {
+            if (xhr.readyState == xhr.OPENED){
+                xhr.setRequestHeader('User-Agent', 'bt-irc-bridge');
+                xhr.removeEventListener('readystatechange', setBridgeUA);
+            }
+        });
+        return xhr;
+    };
+    this.bt = client.connect(CONFIG.server, {
         'force new connection': true
     });
     this.bt.on('newChatList', function (data) {
@@ -698,3 +711,4 @@ if (port !== undefined && port.match(/\d+/)) {
 
 loadConfig();
 var s = new IRCServer(port);
+// vim: ts=4 sts=4 sw=4
