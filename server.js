@@ -14,7 +14,7 @@ var net = require('net');
 var fs = require('fs');
 
 // Config
-var VERSION = '1.0.12';
+var VERSION = '1.0.13';
 var HOSTNAME = 'localhost';
 var CONFIG = {
     yay_color: true,
@@ -59,6 +59,19 @@ function testIfSupportsIPv6(port, cb) {
         test.close();
         cb(true);
     });
+}
+
+function formatVideoLink(video) {
+    switch (video.videotype) {
+        case "yt":
+            return "https://youtu.be/" + video.videoid;
+        case "vimeo":
+            return "https://vimeo.com/" + video.videoid;
+        case "soundcloud":
+            return video.meta.permalink;
+        default:
+            return video.videotype + " - " + video.videoid;
+    }
 }
 
 function IRCServer(port) {
@@ -217,7 +230,8 @@ Client.prototype.initBerrytube = function () {
         }
     });
     this.bt.on('forceVideoChange', function (data) {
-        self.topic = 'Now Playing: ' + decodeURIComponent(data.video.videotitle);
+        self.topic = 'Now Playing: ' + decodeURIComponent(data.video.videotitle) +
+                ' ( ' + formatVideoLink(data.video) + ' )';
         self.socket.write(':BerryTube!BerryTube@berrytube.tv TOPIC #berrytube :' + self.topic + '\r\n');
     });
     this.bt.on('createPlayer', function (data) {
@@ -225,7 +239,8 @@ Client.prototype.initBerrytube = function () {
            if createPlayer is fired after the user JOINS the channels we still
            can send RPL_TOPIC instead of TOPIC, because the topic was empty and
            JOIN didn't create a RPL_TOPIC message */
-         self.topic = 'Now Playing: ' + decodeURIComponent(data.video.videotitle);
+         self.topic = 'Now Playing: ' + decodeURIComponent(data.video.videotitle) +
+                ' ( ' + formatVideoLink(data.video) + ' )';
          self.rpl('332 {nick} #berrytube :' + self.topic);
     });
     this.bt.on('kicked', function (reason) {
