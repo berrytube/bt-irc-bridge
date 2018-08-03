@@ -14,7 +14,7 @@ var net = require('net');
 var fs = require('fs');
 
 // Config
-var VERSION = '1.0.13';
+var VERSION = '1.0.14';
 var HOSTNAME = 'localhost';
 var CONFIG = {
     yay_color: true,
@@ -48,19 +48,6 @@ function loadConfig() {
     }
 }
 
-function testIfSupportsIPv6(port, cb) {
-    var test = net.createServer();
-    test.on("error", function () {
-        test.close();
-        cb(false);
-    });
-
-    test.listen(port, "::", function () {
-        test.close();
-        cb(true);
-    });
-}
-
 function formatVideoLink(video) {
     switch (video.videotype) {
         case "yt":
@@ -80,26 +67,26 @@ function IRCServer(port) {
     this.irc = net.createServer(function (c) {
         self.newClient(c);
     });
-    testIfSupportsIPv6(port, function (supported) {
-        if (supported) {
-            self.irc.listen(port, "::", function () {
-                console.log('Listening on port %d (dual-stack)', port);
-            });
-        } else {
-            self.irc.listen(port, function () {
-                console.log('Listening on port %d (IPv4 only)', port);
-            });
-        }
+    this.irc.listen(port, function () {
+        console.log('Listening on port %d', port);
     });
 }
 
 IRCServer.prototype.newClient = function (socket) {
-    var self = this;
-    console.log('Accepted connection from ' + socket.remoteAddress);
-    var c = new Client(socket);
-    socket.on('end', function () {
-        console.log(c.ip, 'disconnected');
-    });
+    try {
+        var self = this;
+        console.log('Accepted connection from ' + socket.remoteAddress);
+        socket.on('end', function () {
+            console.log(socket.remoteAddress, 'disconnected');
+        });
+        new Client(socket);
+    } catch (error) {
+        console.log('Error accepting client ' + socket.remoteAddress + ': ' + error.stack);
+        try {
+            socket.end();
+        } catch (error) {
+        }
+    }
 };
 
 function Client(socket) {
@@ -113,6 +100,7 @@ function Client(socket) {
     this.socket = socket;
     this.buffer = '';
     this.topic = '';
+    this.closed = false;
 
     socket.on('data', function (data) {
         self.buffer += data;
@@ -121,43 +109,69 @@ function Client(socket) {
         }
     });
 
-    var _socketwrite = socket.write;
-    socket.write = function (what) {
-        console.log(self.ip + ' <-- ', what.replace(/[\r\n]/g, ''));
-        try {
-            _socketwrite.call(socket, what);
-        } catch (e) {
-            console.log(e);
-        }
-    };
+    socket.on('end', function () {
+        self.disconnect();
+    });
 
     // BerryTube data
     this.btnicks = [];
     this.initBerrytube();
-
-    socket.on('end', function () {
-        self.bt.disconnect(true);
-    });
 }
+
+Client.prototype.disconnect = function () {
+    try {
+        if (!this.bt) {
+            console.log('disconnect() called before this.bt is ready for ' + this.ip);
+            console.trace();
+            return;
+        }
+        this.bt.disconnect(true);
+    } catch (error) {
+        console.log(error.stack);
+    } finally {
+        this.closed = true;
+    }
+};
+
+Client.prototype.write = function (what) {
+    if (this.closed) {
+        console.log('Write after close for ' + this.ip);
+        return;
+    }
+
+    try {
+        this.socket.write(what);
+    } catch (error) {
+        console.log('Write error for ' + this.ip + ': ' + error.stack);
+        this.disconnect();
+    }
+};
 
 Client.prototype.initBerrytube = function () {
     var self = this;
-    try {
-        self.bt.socket.disconnect(true);
-    } catch (e) {
+    // Clear any existing connection (for reconnect)
+    if (this.bt) {
+        try {
+            this.bt.disconnect(true);
+        } catch (error) {
+            console.log(error.stack);
+        }
     }
+
     var client = require('socket.io-client');
-    client.util.oldreq = client.util.request;
-    client.util.request = function(xdomain){
-        var xhr = client.util.oldreq(xdomain);
-        xhr.addEventListener('readystatechange', function setBridgeUA() {
-            if (xhr.readyState == xhr.OPENED){
-                xhr.setRequestHeader('User-Agent', 'bt-irc-bridge');
-                xhr.removeEventListener('readystatechange', setBridgeUA);
-            }
-        });
-        return xhr;
-    };
+    if (!client.util.oldreq) {
+        client.util.oldreq = client.util.request;
+        client.util.request = function(xdomain){
+            var xhr = client.util.oldreq(xdomain);
+            xhr.addEventListener('readystatechange', function setBridgeUA() {
+                if (xhr.readyState == xhr.OPENED){
+                    xhr.setRequestHeader('User-Agent', 'bt-irc-bridge');
+                    xhr.removeEventListener('readystatechange', setBridgeUA);
+                }
+            });
+            return xhr;
+        };
+    }
     this.bt = client.connect(CONFIG.server, {
         'force new connection': true
     });
@@ -196,7 +210,7 @@ Client.prototype.initBerrytube = function () {
         if (data.nick === self.name) {
             return;
         }
-        self.socket.write(':' + data.ircnick + ' JOIN #berrytube\r\n');
+        self.write(':' + data.ircnick + ' JOIN #berrytube\r\n');
         self.handleSetType(data.nick, data.type);
     });
     this.bt.on('userPart', function (data) {
@@ -212,10 +226,10 @@ Client.prototype.initBerrytube = function () {
         if (found !== false) {
             self.btnicks.splice(found, 1);
         }
-        self.socket.write(':' + data.ircnick + ' PART #berrytube\r\n');
+        self.write(':' + data.ircnick + ' PART #berrytube\r\n');
     });
     this.bt.on('setNick', function (nick) {
-        self.socket.write(':' + self.name + ' NICK ' + nick + '\r\n');
+        self.write(':' + self.name + ' NICK ' + nick + '\r\n');
         self.name = nick;
         self.loggedIn = true;
     });
@@ -232,7 +246,7 @@ Client.prototype.initBerrytube = function () {
     this.bt.on('forceVideoChange', function (data) {
         self.topic = 'Now Playing: ' + decodeURIComponent(data.video.videotitle) +
                 ' ( ' + formatVideoLink(data.video) + ' )';
-        self.socket.write(':BerryTube!BerryTube@berrytube.tv TOPIC #berrytube :' + self.topic + '\r\n');
+        self.write(':BerryTube!BerryTube@berrytube.tv TOPIC #berrytube :' + self.topic + '\r\n');
     });
     this.bt.on('createPlayer', function (data) {
         /* createPlayer should only be fired once
@@ -244,7 +258,7 @@ Client.prototype.initBerrytube = function () {
          self.rpl('332 {nick} #berrytube :' + self.topic);
     });
     this.bt.on('kicked', function (reason) {
-        self.socket.write(':' + HOSTNAME + ' PRIVMSG ' + self.name + ' :Kicked: ' + reason + '\r\n');
+        self.write(':' + HOSTNAME + ' PRIVMSG ' + self.name + ' :Kicked: ' + reason + '\r\n');
     });
     this.bt.on('newPoll', function (data) {
         self.handleBTPoll(data);
@@ -258,10 +272,10 @@ Client.prototype.initBerrytube = function () {
         self.poll = null;
     });
     this.bt.on('disconnect', function () {
-        self.socket.write(':' + HOSTNAME + ' PRIVMSG ' + self.name + ' :Disconnected from BerryTube\r\n');
+        self.write(':' + HOSTNAME + ' PRIVMSG ' + self.name + ' :Disconnected from BerryTube\r\n');
         if (self.loggedIn) {
             self.loggedIn = false;
-            self.socket.write(':' + self.name + ' NICK anonymous\r\n');
+            self.write(':' + self.name + ' NICK anonymous\r\n');
             self.name = 'anonymous';
         }
     });
@@ -271,31 +285,32 @@ Client.prototype.initBerrytube = function () {
 Client.prototype.rpl = function (msg) {
     msg = msg.replace(/\{nick\}/g, this.name);
     msg = ':' + HOSTNAME + ' ' + msg + '\r\n';
-    try {
-        this.socket.write(msg);
-    } catch (e) {
-        console.log(e);
-    }
+    this.write(msg);
 };
 
 Client.prototype.handleBuffer = function () {
-    var msgs = this.buffer.split('\r\n');
-    this.buffer = msgs[msgs.length - 1];
-    msgs.length -= 1;
-    for (var i = 0; i < msgs.length; i++) {
-        console.log(this.ip + ' --> ',msgs[i]);
-        var cmd = '', prefix = null, args = msgs[i].split(' ');
-        if (msgs[i].indexOf(':') === 0) {
-            prefix = args[0].substring(1);
-            cmd = args[1];
-            args.shift();
-            args.shift();
-        } else {
-            cmd = args[0];
-            args.shift();
-        }
+    try {
+        var msgs = this.buffer.split('\r\n');
+        this.buffer = msgs[msgs.length - 1];
+        msgs.length -= 1;
+        for (var i = 0; i < msgs.length; i++) {
+            console.log(this.ip + ' --> ',msgs[i]);
+            var cmd = '', prefix = null, args = msgs[i].split(' ');
+            if (msgs[i].indexOf(':') === 0) {
+                prefix = args[0].substring(1);
+                cmd = args[1];
+                args.shift();
+                args.shift();
+            } else {
+                cmd = args[0];
+                args.shift();
+            }
 
-        this.handleCommand(prefix, cmd, args);
+            this.handleCommand(prefix, cmd, args);
+        }
+    } catch (error) {
+        console.log('Error in handleBuffer for ' + this.ip + ': ' + error.stack);
+        this.disconnect();
     }
 };
 
@@ -350,7 +365,7 @@ Client.prototype.handleNICK = function (prefix, args) {
             pass: false
         });
     } else if (!this.inChannel) {
-        this.socket.write(':' + args[0] + ' NICK anonymous\r\n');
+        this.write(':' + args[0] + ' NICK anonymous\r\n');
         this.handleJOIN(prefix,  ['#berrytube']);
         this.inChannel = true;
     }
@@ -411,7 +426,7 @@ Client.prototype.handleNAMES = function (prefix, args) {
         var msg = ':' + HOSTNAME + ' 353 ' + this.name + ' = #berrytube :';
         for (var i = 0; i < names.length; i++) {
             if (msg.length + names[i].length + 3 > 512) {
-                this.socket.write(msg + '\r\n');
+                this.write(msg + '\r\n');
                 msg = ':' + HOSTNAME + ' 353 ' + this.name + ' = #berrytube :';
             } else {
                 msg += names[i] + ' ';
@@ -419,7 +434,7 @@ Client.prototype.handleNAMES = function (prefix, args) {
         }
 
         if (msg[msg.length - 1] !== ':') {
-            this.socket.write(msg + '\r\n');
+            this.write(msg + '\r\n');
         }
 
         this.rpl('366 {nick} #berrytube :End of /NAMES list');
@@ -428,7 +443,7 @@ Client.prototype.handleNAMES = function (prefix, args) {
 
 Client.prototype.handleMODE = function (prefix, args) {
     if (args[0] === this.name) {
-        this.socket.write(':' + HOSTNAME + ' MODE ' + this.name + ' +i\r\n');
+        this.write(':' + HOSTNAME + ' MODE ' + this.name + ' +i\r\n');
     } else if (args[0] === '#berrytube') {
         this.rpl('324 {nick} #berrytube +nt');
     }
@@ -474,14 +489,14 @@ Client.prototype.handleControl = function (args) {
     args.shift();
     var self = this;
     var cmsg = function (msg) {
-        self.socket.write(':control PRIVMSG ' + self.name + ' :' + msg + '\r\n');
+        self.write(':control PRIVMSG ' + self.name + ' :' + msg + '\r\n');
     };
     switch (cmd) {
         case 'login': {
             var pass = false;
             var nick = args[0];
             if (nick === undefined) {
-                this.socket.write(':control PRIVMSG ' + this.name + ' :Invalid login details\r\n');
+                this.write(':control PRIVMSG ' + this.name + ' :Invalid login details\r\n');
                 break;
             }
             if (nick[0] === ':') {
@@ -498,7 +513,7 @@ Client.prototype.handleControl = function (args) {
         }
 
         case 'reconnect': {
-            this.socket.write(':control PRIVMSG ' + this.name + ' :Attempting to reconnect to berrytube\r\n');
+            this.write(':control PRIVMSG ' + this.name + ' :Attempting to reconnect to berrytube\r\n');
             this.initBerrytube();
             break;
         }
@@ -506,7 +521,7 @@ Client.prototype.handleControl = function (args) {
         case 'set': {
             var key = args[0];
             if (key === undefined) {
-                this.socket.write(':control PRIVMSG ' + this.name + ' :Available config keys: ' + Object.keys(CONFIG).join(' ') + '\r\n');
+                this.write(':control PRIVMSG ' + this.name + ' :Available config keys: ' + Object.keys(CONFIG).join(' ') + '\r\n');
                 break;
             }
 
@@ -520,12 +535,12 @@ Client.prototype.handleControl = function (args) {
             }
 
             if (!(key in CONFIG)) {
-                this.socket.write(':control PRIVMSG ' + this.name + ' :Unknown config key ' + key + '\r\n');
+                this.write(':control PRIVMSG ' + this.name + ' :Unknown config key ' + key + '\r\n');
                 break;
             }
 
             if (val.trim() === '') {
-                this.socket.write(':control PRIVMSG ' + this.name + ' :Current value of ' + key + ' = ' + CONFIG[key] + '\r\n');
+                this.write(':control PRIVMSG ' + this.name + ' :Current value of ' + key + ' = ' + CONFIG[key] + '\r\n');
                 break;
             }
 
@@ -536,7 +551,7 @@ Client.prototype.handleControl = function (args) {
 
             CONFIG[key] = val;
             saveConfig();
-            this.socket.write(':control PRIVMSG ' + this.name + ' :Updated ' + key + ' = ' + val + '\r\n');
+            this.write(':control PRIVMSG ' + this.name + ' :Updated ' + key + ' = ' + val + '\r\n');
             break;
         }
 
@@ -661,7 +676,7 @@ Client.prototype.handleBTMessage = function (data) {
 
     if (nick !== this.name || CONFIG.echo) {
         nick = nick + '!' + nick + '@berrytube.tv';
-        this.socket.write(':' + nick + ' PRIVMSG #berrytube :' + msg + '\r\n');
+        this.write(':' + nick + ' PRIVMSG #berrytube :' + msg + '\r\n');
     }
 };
 
@@ -673,7 +688,7 @@ Client.prototype.handleBTPoll = function (data) {
     }
     msg = '\x01ACTION ' + msg + '\x01';
     var nick = data.creator + '!' + data.creator + '@berrytube.tv';
-    this.socket.write(':' + nick + ' PRIVMSG #berrytube :' + msg + '\r\n');
+    this.write(':' + nick + ' PRIVMSG #berrytube :' + msg + '\r\n');
 };
 
 Client.prototype.handleBTPollUpdate = function (data) {
@@ -683,13 +698,13 @@ Client.prototype.handleBTPollUpdate = function (data) {
 Client.prototype.handleSetType = function(nick, type) {
     switch (type) {
         case 2:
-            this.socket.write(':' + HOSTNAME + ' MODE #berrytube +o ' + nick + '\r\n');
+            this.write(':' + HOSTNAME + ' MODE #berrytube +o ' + nick + '\r\n');
             break;
         case 1:
-            this.socket.write(':' + HOSTNAME + ' MODE #berrytube +h ' + nick + '\r\n');
+            this.write(':' + HOSTNAME + ' MODE #berrytube +h ' + nick + '\r\n');
             break;
         case 0:
-            this.socket.write(':' + HOSTNAME + ' MODE #berrytube +v ' + nick + '\r\n');
+            this.write(':' + HOSTNAME + ' MODE #berrytube +v ' + nick + '\r\n');
             break;
         default:
             break;
@@ -698,7 +713,7 @@ Client.prototype.handleSetType = function(nick, type) {
 
 Client.prototype.handleJOIN = function(prefix, args) {
     if (args[0] === '#berrytube') {
-        this.socket.write(':' + this.name + ' JOIN #berrytube\r\n');
+        this.write(':' + this.name + ' JOIN #berrytube\r\n');
         
         /* http://tools.ietf.org/html/rfc1459#section-4.2.1
            If a JOIN is successful, the user is then sent the channel's topic
